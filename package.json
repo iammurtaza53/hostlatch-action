@@ -1,0 +1,15 @@
+{
+  "name": "hostlatch-action",
+  "version": "1.0.0",
+  "private": true,
+  "description": "GitHub Action for HostLatch pull-request trust-handoff scanning.",
+  "type": "module",
+  "scripts": {
+    "lint": "node --check prepare.js && node --check test/prepare.test.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "license": "MIT"
+}

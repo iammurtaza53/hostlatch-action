@@ -1,0 +1,94 @@
+name: HostLatch Security Scan
+description: Scan pull-request changes for trust-handoff paths left by AI coding agents.
+author: Murtaza Z.
+
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  base:
+    description: "Git commit or ref used as the comparison base."
+    required: false
+    default: origin/main
+  fail-on:
+    description: "Failure threshold: block, review, or never."
+    required: false
+    default: block
+  output:
+    description: "Relative JSON manifest path inside the checked-out repository."
+    required: false
+    default: hostlatch-manifest.json
+
+outputs:
+  manifest:
+    description: "Absolute path to the generated JSON manifest."
+    value: ${{ steps.prepare.outputs.output_path }}
+  exit-code:
+    description: "HostLatch exit code."
+    value: ${{ steps.scan.outputs.exit_code }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up pinned Node.js
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: 22.13.0
+
+    - name: Validate inputs
+      id: prepare
+      shell: bash
+      env:
+        HL_BASE: ${{ inputs.base }}
+        HL_FAIL_ON: ${{ inputs.fail-on }}
+        HL_OUTPUT: ${{ inputs.output }}
+      run: node "${{ github.action_path }}/prepare.js"
+
+    - name: Scan trust-handoff changes
+      id: scan
+      continue-on-error: true
+      shell: bash
+      env:
+        HL_BASE: ${{ steps.prepare.outputs.base }}
+        HL_FAIL_ON: ${{ steps.prepare.outputs.fail_on }}
+        HL_OUTPUT: ${{ steps.prepare.outputs.output_path }}
+        NPM_CONFIG_IGNORE_SCRIPTS: "true"
+      run: |
+        set +e
+        npx --yes "https://github.com/iammurtaza53/hostlatch/archive/99e6cc09d4f7a66981f82d37df5bc723bd9f3131.tar.gz" \
+          scan "$GITHUB_WORKSPACE" \
+          --base "$HL_BASE" \
+          --fail-on "$HL_FAIL_ON" \
+          --output "$HL_OUTPUT"
+        scan_exit=$?
+        set -e
+
+        echo "exit_code=$scan_exit" >> "$GITHUB_OUTPUT"
+        if [ -f "$HL_OUTPUT" ]; then
+          echo "manifest_created=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "manifest_created=false" >> "$GITHUB_OUTPUT"
+        fi
+        exit "$scan_exit"
+
+    - name: Upload HostLatch manifest
+      if: ${{ always() && steps.scan.outputs.manifest_created == 'true' }}
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: hostlatch-manifest-${{ github.job }}-${{ runner.os }}
+        path: ${{ steps.prepare.outputs.output_path }}
+        if-no-files-found: error
+        retention-days: 14
+
+    - name: Enforce HostLatch decision
+      if: ${{ always() }}
+      shell: bash
+      env:
+        HL_EXIT_CODE: ${{ steps.scan.outputs.exit_code }}
+      run: |
+        exit_code="${HL_EXIT_CODE:-1}"
+        if [ "$exit_code" -ne 0 ]; then
+          echo "::error::HostLatch exited with code $exit_code. The JSON manifest was uploaded when available."
+        fi
+        exit "$exit_code"
