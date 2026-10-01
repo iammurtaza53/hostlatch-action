@@ -8,24 +8,24 @@ branding:
 
 inputs:
   base:
-    description: Git commit or ref used as the comparison base.
+    description: "Git commit or ref used as the comparison base."
     required: false
     default: origin/main
   fail-on:
-    description: Failure threshold: block, review, or never.
+    description: "Failure threshold: block, review, or never."
     required: false
     default: block
   output:
-    description: Relative JSON manifest path inside the checked-out repository.
+    description: "Relative JSON manifest path inside the checked-out repository."
     required: false
     default: hostlatch-manifest.json
 
 outputs:
   manifest:
-    description: Absolute path to the generated JSON manifest.
+    description: "Absolute path to the generated JSON manifest."
     value: ${{ steps.prepare.outputs.output_path }}
   exit-code:
-    description: HostLatch exit code.
+    description: "HostLatch exit code."
     value: ${{ steps.scan.outputs.exit_code }}
 
 runs:
